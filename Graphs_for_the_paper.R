@@ -20,7 +20,8 @@ data$Dataset <- ifelse(data$Dataset %in% c("small_cells", "normal_cells"),
 plot_df <- data.frame(
   Sample  = data$Sample_number,
   Hypoxia = data$Hypoxic_exposure,
-  Morph   = data$Dataset
+  Morph   = data$Dataset,
+  Population = data$Population
 )
 
 # Convert hypoxia to days
@@ -70,32 +71,105 @@ hypoxia_line <- plot_df %>%
     y_max = 100  # end at top
   )
 
+# hypoxia_abnormality_graph -----------------------------------------------
+############################
+# Libraries
+############################
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(patchwork)
+library(umap)
 
-# Plot
-ggplot(df, aes(x = Sample, y = percent, fill = Morph)) +
+set.seed(123)  # for reproducibility
+
+############################
+# Prepare bar chart (top panel)
+############################
+plot_df <- data %>%
+  mutate(Morph = case_when(
+    Dataset == "normal_cells" ~ "Normal nuclei",
+    Dataset == "small_cells"  ~ "Small nuclei",
+    TRUE                      ~ "Abnormal nuclei"
+  )) %>%
+  select(Sample_number, Population, Morph)
+
+# Counts per sample and morphology
+cell_counts <- plot_df %>%
+  count(Sample_number, Morph, Population)
+
+sample_totals <- cell_counts %>%
+  group_by(Sample_number) %>%
+  summarise(Total = sum(n), .groups = "drop")
+
+df_pop <- left_join(cell_counts, sample_totals, by = "Sample_number") %>%
+  mutate(percent = n / Total * 100)
+
+# Order samples by "Abnormal nuclei"
+abnormal_order <- df_pop %>%
+  filter(Morph == "Abnormal nuclei") %>%
+  select(Sample_number, abnormal_percent = percent)
+
+df_pop <- df_pop %>%
+  left_join(abnormal_order, by = "Sample_number") %>%
+  mutate(Sample_number = reorder(Sample_number, -abnormal_percent),
+         Morph = factor(Morph, levels = c("Normal nuclei","Small nuclei","Abnormal nuclei")))
+
+top_plot <- ggplot(df_pop, aes(x = Sample_number, y = percent, fill = Morph)) +
   geom_bar(stat = "identity") +
-  geom_segment(
-    data = hypoxia_line,
-    aes(x = x, xend = x,
-        y = y_min, yend = y_max,
-        color = factor(Hypoxia_days)),  # default ggplot2 colors
-    inherit.aes = FALSE,
-    size = 0.8
-  ) +
-  scale_fill_manual(values = c("Abnormal nuclei" = "grey80",
-                               "Normal nuclei" = "grey20",
-                               "Small nuclei" = "grey50")) +
-  scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+  facet_wrap(~Population, nrow = 1, scales = "free_x") +
+  scale_fill_manual(values = c(
+    "Abnormal nuclei" = "grey80",
+    "Normal nuclei" = "grey20",
+    "Small nuclei" = "grey50"
+  )) +
   labs(
-    title = "Samples ordered by abnormal nuclei with hypoxia overlaid",
+    title = "Morphology composition per sample",
     x = "Sample",
-    y = "Percentage",
-    color = "Hypoxia (days)"
+    y = "Percentage"
   ) +
   theme(
     axis.text.x = element_blank(),
     axis.ticks.x = element_blank(),
+    legend.title = element_blank(),
+    strip.text = element_text(size = 12)
+  )
+
+############################
+# Prepare UMAP (bottom panel)
+############################
+
+# Select 1000 random rows per population
+umap_df_sample <- data %>%
+  group_by(Population) %>%
+  slice_sample(n = 5000) %>%
+  ungroup()
+
+# Use Diameter_profile_0-99 for UMAP
+diam_cols <- paste0("Diameter_profile_", 0:99)
+umap_matrix <- umap_df_sample %>%
+  select(all_of(diam_cols)) %>%
+  as.matrix()
+
+# Run UMAP
+set.seed(123)
+umap_res <- umap(umap_matrix)
+
+umap_plot_df <- as.data.frame(umap_res$layout)
+colnames(umap_plot_df) <- c("UMAP1","UMAP2")
+umap_plot_df$Population <- umap_df_sample$Population
+
+bottom_plot <- ggplot(umap_plot_df, aes(x = UMAP1, y = UMAP2, color = Population)) +
+  geom_point(size = 1) +
+  labs(title = "UMAP of randomly sampled cells (5000 per Population)") +
+  theme_minimal() +
+  theme(
     legend.title = element_text(size = 10),
     legend.text = element_text(size = 9)
   )
+
+############################
+# Combine panels
+############################
+top_plot / bottom_plot + plot_layout(heights = c(1,2))
 
