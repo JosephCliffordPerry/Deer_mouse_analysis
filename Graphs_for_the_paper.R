@@ -1,6 +1,6 @@
 library(dplyr)
 library(ggplot2)
-
+library(patchwork)
 rawdata<-read.table("D:/2024-2025_sperm_images/Deer_Mouse/Deer_mouse_analysis/Clustered_deer_mice_stats.txt", sep = "\t", header = TRUE)
 
 Phenotype_data<-read.table("D:/2024-2025_sperm_images/Deer_Mouse/Deer_mouse_analysis/Deer_mouse_phenotype_data.txt", sep = "\t", header = TRUE)
@@ -72,6 +72,123 @@ hypoxia_line <- plot_df %>%
   )
 
 # hypoxia_abnormality_graph -----------------------------------------------
+# Plot
+ggplot(df, aes(x = Sample, y = percent, fill = Morph)) +
+  geom_bar(stat = "identity") +
+  geom_segment(
+    data = hypoxia_line,
+    aes(x = x, xend = x,
+        y = y_min, yend = y_max,
+        color = factor(Hypoxia_days)),
+    inherit.aes = FALSE,
+    size = 0.8
+  ) +
+  scale_fill_manual(values = c("Abnormal nuclei" = "grey80",
+                               "Normal nuclei" = "grey20",
+                               "Small nuclei" = "grey50")) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+  labs(
+    title = "Samples ordered by abnormal nuclei with hypoxia overlaid",
+    x = "Sample",
+    y = "Percentage",
+    color = "Hypoxia (days)"
+  ) +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 9)
+  )
+
+
+
+
+
+
+# Add hypoxia_days to df for faceting
+
+df <- df %>%
+  left_join(
+    plot_df %>% distinct(Sample, Hypoxia_days),
+    by = "Sample"
+  ) %>%
+  mutate(
+    Sample = reorder(Sample, Hypoxia_days)
+  )
+df <- df %>%
+  left_join(
+    plot_df %>% distinct(Sample, Population),
+    by = "Sample"
+  )
+sample_order <- df %>%
+  filter(Morph == "Abnormal nuclei") %>%
+  arrange(Population, desc(percent)) %>%
+  pull(Sample) %>%
+  unique()
+df <- df %>%
+  mutate(
+    Sample = factor(Sample, levels = sample_order)
+  )
+
+library(ggh4x)
+
+############################
+# 1) Facet by Morphotype
+############################
+a <- ggplot(df, aes(x = Sample, y = percent, fill = factor(Hypoxia_days))) +
+  geom_bar(stat = "identity") +
+  facet_nested(
+    . ~ Morph + Population,
+    scales = "free_x",
+    space  = "free_x"
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+  labs(
+    title = "Morphology composition per sample",
+    x = "Sample",
+    y = "Percentage",
+    fill = "Hypoxia (days)"
+  ) +
+  theme(
+    axis.text.x  = element_blank(),
+    axis.ticks.x = element_blank(),
+    strip.text.x = element_text(size = 11)
+  )
+
+
+
+
+############################
+# 2) Facet by Hypoxia condition
+############################
+b <- ggplot(df, aes(x = Sample, y = percent, fill = Morph)) +
+  geom_bar(stat = "identity") +
+  facet_nested(
+    . ~ Hypoxia_days + Population,
+    scales = "free_x",
+    space  = "free_x"
+  ) +
+  scale_fill_manual(values = c(
+    "Abnormal nuclei" = "grey80",
+    "Normal nuclei"   = "grey20",
+    "Small nuclei"    = "grey50"
+  )) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+  labs(
+    title = "Morphological composition per sample",
+    x = "Sample",
+    y = "Percentage"
+  ) +
+  theme(
+    axis.text.x  = element_blank(),
+    axis.ticks.x = element_blank(),
+    legend.title = element_blank(),
+    strip.text.x = element_text(size = 11)
+  )
+
+
+
+a/b
 ############################
 # Libraries
 ############################
