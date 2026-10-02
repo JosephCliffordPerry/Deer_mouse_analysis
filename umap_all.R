@@ -1,40 +1,115 @@
 library(umap)
 library(ggplot2)
-data<-read.table("D:/2024-2025_sperm_images/Deer_Mouse/Deer_mouse_analysis/Combined_relabelled_deer_mice_stats.txt", sep = "\t", header = TRUE)
-numdata <- dplyr::select_if(data, is.numeric)
-print("umap1 started")
-umapdata <- numdata[, !grepl("seg|outline", names(numdata), ignore.case = TRUE)]
-umapo <- umap(umapdata, preserve.seed = TRUE)
-#save(umapo,file = "D:/2024-2025_sperm_images/Deer_Mouse/Deer_mouse_analysis/umapo.rda")
+library(dplyr)
 
+#data<-read.table("D:/2024-2025_sperm_images/Deer_Mouse/Deer_mouse_analysis/Combined_relabelled_deer_mice_stats.txt", sep = "\t", header = TRUE)
+#numdata <- dplyr::select_if(data, is.numeric)
+#print("umap1 started")
+#umapdata <- numdata[, !grepl("seg|outline", names(numdata), ignore.case = TRUE)]
+#umapo <- umap(umapdata, preserve.seed = TRUE)
+#save(umapo,file = "D:/2024-2025_sperm_images/Deer_Mouse/Deer_mouse_analysis/umapo.rda")
+load("umapo.rda")
 
 
 
 rawdata<-read.table("D:/2024-2025_sperm_images/Deer_Mouse/Deer_mouse_analysis/Clustered_deer_mice_stats.txt", sep = "\t", header = TRUE)
 
 Phenotype_data<-read.table("D:/2024-2025_sperm_images/Deer_Mouse/Deer_mouse_analysis/Deer_mouse_phenotype_data.txt", sep = "\t", header = TRUE)
+Phenotype_data$Hypoxic_exposure <- dplyr::recode(
+  Phenotype_data$Hypoxic_exposure,
+  "2w" = "2wk",
+  "6w" = "6wk"
+)
+
 unified_format_image<-gsub("24_11_06", "slide", rawdata$Image)
 Sample_number<- sub("^.*?_(.*?)_.*$", "\\1", unified_format_image)
 data_with_sample<-cbind(rawdata,Sample_number)
-data_with_hypoxia<-merge(data_with_sample,Phenotype_data,by = "Sample_number")
+all_combo_colors <- c(
+  KN_Control = "#F48367",
+  KN_2day    = "#EF552E",
+  KN_2wk     = "#D13610",
+  KN_6wk     = "#8E260B",
+  ME_Control = "#689BCA",
+  ME_2day    = "#407CB5",
+  ME_2wk     = "#356897",
+  ME_6wk     = "#254869"
+)
+data_with_hypoxia <- dplyr::left_join(
+  data_with_sample,
+  Phenotype_data,
+  by = "Sample_number"
+)
+graphdata <- data.frame(
+  UMAP1 = umapo$layout[,1],
+  UMAP2 = umapo$layout[,2],
+  Population = data_with_hypoxia$Population,
+  Hypoxia_label = data_with_hypoxia$Hypoxic_exposure
+) %>%
+  dplyr::mutate(
+    combo = paste0(Population, "_", Hypoxia_label)
+  )
+ggplot(graphdata,
+       aes(UMAP1, UMAP2, colour = combo)) +
+  geom_point(size = 0.5, alpha = 0.6) +
+  scale_colour_manual(values = all_combo_colors) +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title = element_blank()
+  )
 
 
-graphdata<-as.data.frame(cbind(umapo$layout,data_with_hypoxia$Hypoxic_exposure))
+#umap of dataset subset
+
+library(dplyr)
+library(umap)
+data<-read.table("D:/2024-2025_sperm_images/Deer_Mouse/Deer_mouse_analysis/Combined_relabelled_deer_mice_stats.txt", sep = "\t", header = TRUE)
+numdata <- dplyr::select_if(data, is.numeric)
+set.seed(123)
+umapdata <- numdata[, grepl("_profile_", names(numdata))]
+# create metadata first
+graphdata <- data.frame(
+  CellID = rawdata$CellID,
+  Population = data_with_hypoxia$Population,
+  Hypoxia = data_with_hypoxia$Hypoxic_exposure
+) %>%
+  filter(!is.na(Population), !is.na(Hypoxia)) %>%
+  mutate(combo = paste0(Population, "_", Hypoxia))
+
+# sample 2000 per group
+selected_cells <- graphdata %>%
+group_by(combo) %>%
+group_modify(~ .x[sample(nrow(.x), min(2000, nrow(.x))), ]) %>%
+ungroup()
+
+# match back to original feature matrix
+keep <- match(selected_cells$CellID, data$CellID)
+
+umapdata_sub <- umapdata[keep, ]
+
+# run UMAP on balanced dataset
+umapo_sub <- umap(umapdata_sub, preserve.seed = TRUE)
+
+plotdata <- data.frame(
+  UMAP1 = umapo_sub$layout[,1],
+  UMAP2 = umapo_sub$layout[,2],
+  combo = selected_cells$combo
+)
+
+ggplot(plotdata,
+       aes(UMAP1, UMAP2, colour = combo)) +
+  geom_point(size = 0.3, alpha = 0.6) +
+  scale_colour_manual(values = all_combo_colors) +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title = element_blank(),
+    panel.grid = element_blank()
+  )
 
 
-ggplot(data = graphdata)+
-  geom_point(aes(x = V1,y = V2,colour = factor(V3)))+
-  theme(axis.text.x = element_blank(),axis.text.y = element_blank()) +
-  labs(title = "General UMAP coloured by hypoxic exposure", colour = NULL)
 
-graphdata
-
-graphdata<-as.data.frame(cbind(umapo$layout,data_with_hypoxia$))
-
-
-library(dbscan)
-kNNdistplot(umapo$layout,minPts = 2)
-
-umap_cluster<-dbscan(umapo$layout,eps = 0.05)
-export<-cbind(rawdata$CellID,umap_cluster$cluster)
-write.table(export,file = "D:/2024-2025_sperm_images/Deer_Mouse/Deer_mouse_analysis/umap_clusters.txt",sep = "\t",row.names = FALSE, col.names = TRUE,quote = FALSE)

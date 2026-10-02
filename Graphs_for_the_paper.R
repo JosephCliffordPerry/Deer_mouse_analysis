@@ -43,7 +43,16 @@ plot_df <- plot_df %>%
     Hypoxia == "6wk"     ~ 42,
     TRUE ~ NA_real_
   ))
-
+all_combo_colors <- c(
+  KN_Control = "#F48367",
+  KN_2day    = "#EF552E",
+  KN_2wk     = "#D13610",
+  KN_6wk     = "#8E260B",
+  ME_Control = "#689BCA",
+  ME_2day    = "#407CB5",
+  ME_2wk     = "#356897",
+  ME_6wk     = "#254869"
+)
 ############################
 # Base percentage table
 ############################
@@ -56,66 +65,13 @@ df <- plot_df %>%
     Morph = factor(
       Morph,
       levels = c("normal_cells","small_cells","other_cells"),
-      labels = c("Normal nuclei","Small nuclei","Abnormal nuclei")
+      labels = c("Normal nuclei","Intermediate","Abnormal nuclei")
     )
   )
 
 
 ############################################################
-# -------- GRAPH A ORDERING --------
-# Order by GENERAL % of each Morph within Population
-# while visually grouping by Hypoxia
-############################################################
-
-# 1. Calculate general morphology ordering
-order_a <- df %>%
-  group_by(Morph, Population, Sample) %>%
-  summarise(morph_percent = sum(percent), .groups = "drop") %>%
-  group_by(Morph, Population) %>%
-  arrange(desc(morph_percent)) %>%
-  mutate(order_id = row_number()) %>%
-  ungroup()
-
-# 2. Join ordering back
-df_a <- df %>%
-  left_join(order_a, by = c("Morph","Population","Sample"))
-
-# 3. Create X axis grouped by Hypoxia but ordered by percentage
-df_a <- df_a %>%
-  arrange(Morph, Population, Hypoxia_days, order_id) %>%
-  mutate(
-    x_id = interaction(Morph, Population, Hypoxia_days, Sample, drop = TRUE),
-    x_id = factor(x_id, levels = unique(x_id))
-  )
-
-############################
-# GRAPH A
-############################
-a <- ggplot(
-  df_a,
-  aes(x = x_id, y = percent, fill = factor(Hypoxia_days))
-) +
-  geom_bar(stat = "identity") +
-  facet_nested(. ~ Morph + Population,
-               scales = "free_x",
-               space  = "free_x") +
-  scale_x_discrete(labels = function(x) sub("^.*\\.", "", x)) +
-  scale_y_continuous(expand = expansion(mult = c(0,0.05))) +
-  labs(
-    title = "Samples grouped by hypoxia and ordered by morphology %",
-    x = "Sample",
-    y = "Percentage",
-    fill = "Hypoxia (days)"
-  ) +
-  theme(
-    axis.text.x  = element_blank(),
-    axis.ticks.x = element_blank(),
-    strip.text.x = element_text(size = 11)
-  )
-
-
-############################################################
-# -------- GRAPH B ORDERING --------
+# -------- GRAPH ORDERING --------
 # Ordered by abnormal % inside Hypoxia × Population
 ############################################################
 
@@ -131,37 +87,157 @@ df_b <- df %>%
   left_join(order_b, by = c("Sample","Hypoxia_days","Population")) %>%
   mutate(x_id = interaction(Hypoxia_days, Population, Sample, drop = TRUE))
 
-############################
-# GRAPH B
-############################
-b <- ggplot(
-  df_b,
-  aes(x = reorder(x_id, -order_id), y = percent, fill = Morph)
-) +
-  geom_bar(stat = "identity") +
-  facet_nested(. ~ Hypoxia_days + Population,
-               scales = "free_x",
-               space  = "free_x") +
-  scale_fill_manual(values = c(
-    "Abnormal nuclei" = "grey80",
-    "Normal nuclei"   = "grey20",
-    "Small nuclei"    = "grey50"
-  )) +
-  scale_x_discrete(labels = function(x) sub("^.*\\.", "", x)) +
-  scale_y_continuous(expand = expansion(mult = c(0,0.05))) +
-  labs(
-    title = "Samples with morphology % faceted by hypoxia and population",
-    x = "Sample",
-    y = "Percentage"
-  ) +
-  theme(
-    axis.text.x  = element_blank(),
-    axis.ticks.x = element_blank(),
-    strip.text.x = element_text(size = 11),
-    legend.title = element_blank()
+df <- df %>%
+  mutate(
+    Hypoxia_label = case_when(
+      Hypoxia_days == 0  ~ "Control",
+      Hypoxia_days == 2  ~ "2day",
+      Hypoxia_days == 14 ~ "2wk",
+      Hypoxia_days == 42 ~ "6wk"
+    ),
+    combo = paste0(Population, "_", Hypoxia_label)
   )
 
-############################
-# Combine plots
-############################
-a / b
+legend_df <- data.frame(
+  Morph = "Abnormal nuclei",
+  xmin  = c(3.20, 3.35, 3.50, 3.65,
+            3.20, 3.35, 3.50, 3.65),
+  xmax  = c(3.35, 3.50, 3.65, 3.80,
+            3.35, 3.50, 3.65, 3.80),
+  ymin  = c(95,95,95,95,85,85,85,85),
+  ymax  = c(100,100,100,100,90,90,90,90),
+  fill  = c(
+    "#F48367","#EF552E","#D13610","#8E260B",
+    "#689BCA","#407CB5","#356897","#254869"
+  )
+)
+
+label_df <- data.frame(
+  Morph = "Abnormal nuclei",
+  x = c(3.9, 3.9),
+  y = c(97.5, 87.5),
+  label = c("KN", "MBS")
+)
+
+legend_df$Morph <- factor(
+  legend_df$Morph,
+  levels = levels(df$Morph)
+)
+
+label_df$Morph <- factor(
+  label_df$Morph,
+  levels = levels(df$Morph)
+)
+base_size<-8
+b <- ggplot(
+  df,
+  aes(
+    x = factor(Hypoxia_days),
+    y = percent,
+    colour = combo,
+  )
+) +
+
+  geom_point(
+    position = position_jitter(width = 0.15, height = 0),
+    size = 2,
+    alpha = 0.7
+  ) +
+
+  stat_summary(
+    fun = median,
+    geom = "crossbar",
+    width = 0.5,
+    fatten = 0,
+    colour = "black"
+  ) +
+
+  facet_nested(
+    . ~ Morph,
+    scales = "free_x",
+    space = "free_x"
+  ) +
+
+  scale_colour_manual(
+    values = all_combo_colors,
+    labels = c(
+      KN_Control = "KN Control",
+      KN_2day    = "KN 2 days",
+      KN_2wk     = "KN 2 weeks",
+      KN_6wk     = "KN 6 weeks",
+      ME_Control = "MBS Control",
+      ME_2day    = "MBS 2 days",
+      ME_2wk     = "MBS 2 weeks",
+      ME_6wk     = "MBS 6 weeks"
+    ),
+    name = NULL
+  ) +
+
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(size = base_size),
+    axis.text.x = element_text(
+      angle = 45,
+      vjust = 1,
+      hjust = 1,
+      margin = margin(t = 8),
+      size = base_size
+    ),
+    axis.text.y = element_text(size = base_size),  # increase y-axis labels too
+    strip.text.x = element_text(size = base_size+2),
+    plot.margin = unit(c(0.4, 0.07, 0, 0.07), "cm"),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.ticks.length.x = unit(0, "cm"),
+    axis.ticks.length.y = unit(0, "cm"),
+  ) +
+
+  scale_x_discrete(
+    labels = c(
+      "0"  = "Control",
+      "2"  = "2 days",
+      "14" = "2 weeks",
+      "42" = "6 weeks"
+    )
+  ) +
+
+  ylab("Percentage") +
+  xlab("Duration of hypoxic exposure")+
+  geom_rect(
+    data = legend_df,
+    aes(xmin = xmin, xmax = xmax,
+        ymin = ymin, ymax = ymax,
+        fill = fill),
+    inherit.aes = FALSE
+  ) +
+  scale_fill_identity() +
+  geom_text(
+    data = label_df,
+    aes(x = x, y = y, label = label),
+    inherit.aes = FALSE,
+    hjust = 0,
+    size = 2
+  )+coord_cartesian(clip = "off")
+
+b
+
+#1205 X 340 px
+width_in  <- 1205 / 300
+height_in <- 502 / 300
+
+width_in
+# 4.02
+
+height_in
+# 1.13
+ggsave(
+  "Morph_percentages.pdf",
+  b,
+  device = cairo_pdf,
+  width = width_in,
+  height = height_in,
+  units = "in",
+  bg = "white"
+)

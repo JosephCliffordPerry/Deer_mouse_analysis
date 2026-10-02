@@ -1,3 +1,6 @@
+library(dplyr)
+library(ggplot2)
+
 rawdata<-read.table("D:/2024-2025_sperm_images/Deer_Mouse/Deer_mouse_analysis/Clustered_deer_mice_stats.txt", sep = "\t", header = TRUE)
 
 Phenotype_data<-read.table("D:/2024-2025_sperm_images/Deer_Mouse/Deer_mouse_analysis/Deer_mouse_phenotype_data.txt", sep = "\t", header = TRUE)
@@ -9,7 +12,7 @@ data<-merge(data_with_sample,Phenotype_data,by = "Sample_number")
 
 data$Dataset<-gsub("Group_1_Cluster_8","small_cells",data$Dataset)
 data$Dataset<-gsub("Group_1_Cluster_7","normal_cells",data$Dataset)
-dataset$Dataset <- ifelse(data$Dataset %in% c("small_cells", "normal_cells"),
+data$Dataset <- ifelse(data$Dataset %in% c("small_cells", "normal_cells"),
                             data$Dataset,
                             "other_cells")
 
@@ -26,7 +29,7 @@ graphdata2<-merge(hypoxic_samples,sample_ratios,by = "Var1")
 
 graphdata3 <- graphdata2[graphdata2$Freq.x != 0, ]
 graphdata3$percent<-(graphdata3$Freq.y/graphdata3$Freq.x)*100
-library(dplyr)
+
 
 sorted_graphdata <- graphdata3 %>%
   group_by(Var1) %>%
@@ -67,9 +70,7 @@ graphdata2<-merge(Population_samples,sample_ratios,by = "Var1")
 
 graphdata3 <- graphdata2[graphdata2$Freq.x != 0, ]
 graphdata3$percent<-(graphdata3$Freq.y/graphdata3$Freq.x)*100
-library(dplyr)
 
-library(dplyr)
 
 # Step 1: Calculate the total "normal_cells" percentage for each Var1
 normal_cell_order <- graphdata3 %>%
@@ -113,9 +114,7 @@ graphdata2<-merge(Population_samples,sample_ratios,by = "Var1")
 
 graphdata3 <- graphdata2[graphdata2$Freq.x != 0, ]
 graphdata3$percent<-(graphdata3$Freq.y/graphdata3$Freq.x)*100
-library(dplyr)
 
-library(dplyr)
 
 # Step 1: Calculate the total "normal_cells" percentage for each Var1
 normal_cell_order <- graphdata3 %>%
@@ -241,7 +240,7 @@ sorted_graphdata <- graphdata3 %>%
 
 
 ggplot(sorted_graphdata, aes(x = Var1, y = percent, fill = Var2.y))+
-  geom_bar(stat = "identity") +
+  geom_bar(stat = "id entity") +
   facet_wrap(~ Var2.x,nrow = 1,scale = "free") +
   labs(
     x = "Category",

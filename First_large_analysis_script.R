@@ -223,3 +223,4 @@ hamming_consensus <- Make_hamming_consensus_images(outlinedata = outlinedata, cl
 export<-cbind(hamming_cluster$UUID,hamming_cluster$Cluster_characterising_ids)
 write.table(export,file = "D:/2024-2025_sperm_images/Deer_Mouse/Deer_mouse_analysis/clustering3.txt",sep = "\t",row.names = FALSE, col.names = TRUE,quote = FALSE)
 hamming_consensus
+
