@@ -1,6 +1,4 @@
-library(devtools)
-load_all()
-
+library(NMAcompanion)
 rawdata<-read.table("D:/2024-2025_sperm_images/Deer_Mouse/Deer_mouse_analysis/Combined_relabelled_deer_mice_stats.txt", sep = "\t", header = TRUE)
 ROI<-get_regions_of_interest(rawdata)
 #install.packages("dbscan")

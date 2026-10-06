@@ -1,4 +1,5 @@
-morph_matrix <- df %>%
+library(dplyr)
+morph_matrix <- BasePercentageTable %>%
   select(Sample, Population, Morph, percent) %>%
   tidyr::pivot_wider(
     names_from = Morph,
@@ -35,29 +36,65 @@ disp <- betadisper(
 anova(disp)
 
 
-lm(percent ~ Population + factor(Hypoxia_days),
-   data = subset(df, Morph == "Abnormal nuclei"))
+summary(lm(percent ~ Population + factor(Hypoxia_days),
+   data = subset(BasePercentageTable, Morph == "Abnormal nuclei")))
 
-lm(percent ~ Population + factor(Hypoxia_days),
-   data = subset(df, Morph == "Intermediate"))
+summary(lm(percent ~ Population + factor(Hypoxia_days),
+   data = subset(BasePercentageTable, Morph == "Intermediate")))
 
 
-lm(percent ~ Population + factor(Hypoxia_days),
-   data = subset(df, Morph == "Normal nuclei"))
+summary(lm(percent ~ Population + factor(Hypoxia_days),
+   data = subset(BasePercentageTable, Morph == "Normal nuclei")))
 
 
 wilcox.test(
   percent ~ Population,
-  data = subset(df, Morph == "Abnormal nuclei")
+  data = subset(BasePercentageTable, Morph == "Abnormal nuclei")
 )
 
 wilcox.test(
   percent ~ Population,
-  data = subset(df, Morph == "Intermediate")
+  data = subset(BasePercentageTable, Morph == "Intermediate")
 )
 
 wilcox.test(
   percent ~ Population,
-  data = subset(df, Morph == "Normal nuclei")
+  data = subset(BasePercentageTable, Morph == "Normal nuclei")
 )
 
+fligner.test(
+  percent ~ Population,
+  data = subset(BasePercentageTable, Morph == "Abnormal nuclei")
+)
+
+fligner.test(
+  percent ~ Population,
+  data = subset(BasePercentageTable, Morph == "Intermediate")
+)
+
+fligner.test(
+  percent ~ Population,
+  data = subset(BasePercentageTable, Morph == "Normal nuclei")
+)
+
+library(dplyr)
+
+variability <- BasePercentageTable %>%
+  group_by(Morph, Population) %>%
+  summarise(
+    SD = sd(percent),
+    IQR = IQR(percent),
+    .groups = "drop"
+  )
+
+variability_wide <- variability %>%
+  tidyr::pivot_wider(
+    names_from = Population,
+    values_from = c(SD, IQR)
+  ) %>%
+  mutate(
+    SD_ratio = SD_KN / SD_ME,
+    IQR_ratio = IQR_KN / IQR_ME
+  )
+
+variability_wide

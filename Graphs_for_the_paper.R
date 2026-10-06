@@ -56,7 +56,7 @@ all_combo_colors <- c(
 ############################
 # Base percentage table
 ############################
-df <- plot_df %>%
+BasePercentageTable <- plot_df %>%
   count(Sample, Morph, Population, Hypoxia_days) %>%
   group_by(Sample) %>%
   mutate(percent = n / sum(n) * 100) %>%
@@ -223,21 +223,21 @@ b <- ggplot(
 
 b
 
-#1205 X 340 px
-width_in  <- 1205 / 300
-height_in <- 502 / 300
-
-width_in
-# 4.02
-
-height_in
-# 1.13
-ggsave(
-  "Morph_percentages.pdf",
-  b,
-  device = cairo_pdf,
-  width = width_in,
-  height = height_in,
-  units = "in",
-  bg = "white"
-)
+# #1205 X 340 px
+# width_in  <- 1205 / 300
+# height_in <- 502 / 300
+#
+# width_in
+# # 4.02
+#
+# height_in
+# # 1.13
+# ggsave(
+#   "Morph_percentages.pdf",
+#   b,
+#   device = cairo_pdf,
+#   width = width_in,
+#   height = height_in,
+#   units = "in",
+#   bg = "white"
+# )

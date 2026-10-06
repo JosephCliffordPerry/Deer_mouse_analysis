@@ -2,16 +2,6 @@ library(umap)
 library(ggplot2)
 library(dplyr)
 
-#data<-read.table("D:/2024-2025_sperm_images/Deer_Mouse/Deer_mouse_analysis/Combined_relabelled_deer_mice_stats.txt", sep = "\t", header = TRUE)
-#numdata <- dplyr::select_if(data, is.numeric)
-#print("umap1 started")
-#umapdata <- numdata[, !grepl("seg|outline", names(numdata), ignore.case = TRUE)]
-#umapo <- umap(umapdata, preserve.seed = TRUE)
-#save(umapo,file = "D:/2024-2025_sperm_images/Deer_Mouse/Deer_mouse_analysis/umapo.rda")
-load("umapo.rda")
-
-
-
 rawdata<-read.table("D:/2024-2025_sperm_images/Deer_Mouse/Deer_mouse_analysis/Clustered_deer_mice_stats.txt", sep = "\t", header = TRUE)
 
 Phenotype_data<-read.table("D:/2024-2025_sperm_images/Deer_Mouse/Deer_mouse_analysis/Deer_mouse_phenotype_data.txt", sep = "\t", header = TRUE)
@@ -39,39 +29,17 @@ data_with_hypoxia <- dplyr::left_join(
   Phenotype_data,
   by = "Sample_number"
 )
-graphdata <- data.frame(
-  UMAP1 = umapo$layout[,1],
-  UMAP2 = umapo$layout[,2],
-  Population = data_with_hypoxia$Population,
-  Hypoxia_label = data_with_hypoxia$Hypoxic_exposure
-) %>%
-  dplyr::mutate(
-    combo = paste0(Population, "_", Hypoxia_label)
-  )
-ggplot(graphdata,
-       aes(UMAP1, UMAP2, colour = combo)) +
-  geom_point(size = 0.5, alpha = 0.6) +
-  scale_colour_manual(values = all_combo_colors) +
-  theme_bw() +
-  theme(
-    legend.position = "none",
-    axis.text = element_blank(),
-    axis.ticks = element_blank(),
-    axis.title = element_blank()
-  )
 
 
 #umap of dataset subset
 
-library(dplyr)
-library(umap)
 data<-read.table("D:/2024-2025_sperm_images/Deer_Mouse/Deer_mouse_analysis/Combined_relabelled_deer_mice_stats.txt", sep = "\t", header = TRUE)
-numdata <- dplyr::select_if(data, is.numeric)
+numdata <- dplyr::select_if(rawdata, is.numeric)
 set.seed(123)
 umapdata <- numdata[, grepl("_profile_", names(numdata))]
 # create metadata first
 graphdata <- data.frame(
-  CellID = rawdata$CellID,
+  CellID = data_with_hypoxia$CellID,
   Population = data_with_hypoxia$Population,
   Hypoxia = data_with_hypoxia$Hypoxic_exposure
 ) %>%
@@ -81,7 +49,7 @@ graphdata <- data.frame(
 # sample 2000 per group
 selected_cells <- graphdata %>%
 group_by(combo) %>%
-group_modify(~ .x[sample(nrow(.x), min(2000, nrow(.x))), ]) %>%
+group_modify(~ .x[sample(nrow(.x), min(500, nrow(.x))), ]) %>%
 ungroup()
 
 # match back to original feature matrix
@@ -100,7 +68,7 @@ plotdata <- data.frame(
 
 ggplot(plotdata,
        aes(UMAP1, UMAP2, colour = combo)) +
-  geom_point(size = 0.3, alpha = 0.6) +
+  geom_point(size = 2, alpha = 0.6) +
   scale_colour_manual(values = all_combo_colors) +
   theme_bw() +
   theme(
@@ -110,6 +78,4 @@ ggplot(plotdata,
     axis.title = element_blank(),
     panel.grid = element_blank()
   )
-
-
 

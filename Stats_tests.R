@@ -34,7 +34,6 @@ data <- merge(
   by = "Sample_number"
 )
 
-library(dplyr)
 
 profiledata <- data %>%
   select(contains("_profile_"))
@@ -93,3 +92,81 @@ table(results$Bonferroni)
 
 sig_results <- results %>%
   filter(Bonferroni < 0.05)
+
+
+
+###########
+#simple iqr based variability for the populations and the samples
+
+
+
+fligner_results <- lapply(names(profiledata), function(col){
+
+  test <- fligner.test(
+    data[[col]] ~ data$Population
+  )
+
+  data.frame(
+    Variable = col,
+    P = test$p.value
+  )
+
+})
+
+fligner_results <- bind_rows(fligner_results)
+
+fligner_results$FDR <- p.adjust(
+  fligner_results$P,
+  method = "BH"
+)
+
+fligner_results$Bonferroni <- p.adjust(
+  fligner_results$P,
+  method = "bonferroni"
+)
+
+fligner_results <- fligner_results %>%
+  arrange(Bonferroni)
+
+head(fligner_results, 100)
+pop_iqr <- lapply(names(profiledata), function(col){
+
+  data.frame(
+    Variable = col,
+    KN_IQR = IQR(
+      data[data$Population == "KN", col],
+      na.rm = TRUE
+    ),
+    ME_IQR = IQR(
+      data[data$Population == "ME", col],
+      na.rm = TRUE
+    )
+  )
+
+})
+
+pop_iqr <- bind_rows(pop_iqr)
+
+pop_iqr$More_variable <- ifelse(
+  pop_iqr$KN_IQR > pop_iqr$ME_IQR,
+  "KN",
+  "ME"
+)
+pop_iqr$Fold_difference <- pmax(
+  pop_iqr$KN_IQR,
+  pop_iqr$ME_IQR
+) / pmin(
+  pop_iqr$KN_IQR,
+  pop_iqr$ME_IQR
+)
+
+pop_iqr <- merge(
+  pop_iqr,
+  fligner_results,
+  by = "Variable"
+)
+
+pop_iqr_sig <- pop_iqr %>%
+  filter(Bonferroni < 0.05)
+
+pop_iqr_sig
